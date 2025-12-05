@@ -1,0 +1,67 @@
+- name: Manual installation of code-server
+  hosts: code-server-droplet
+  become: yes
+
+  vars:
+    code_server_version: "4.106.3"     
+    # code_server_password: "{{ lookup('env', 'CODE_SERVER_PASSWORD') }}"
+    install_dir: "/usr/local/share"
+    cs_dir: "code-server-{{ code_server_version }}-linux-amd64"
+
+  tasks:
+
+    - name: Ensure required packages installed
+      apt:
+        name: [curl, wget, tar]
+        state: present
+        update_cache: yes
+
+    - name: Download code-server tarball
+      get_url:
+        url: "https://github.com/coder/code-server/releases/download/v{{ code_server_version }}/{{ cs_dir }}.tar.gz"
+        dest: "/tmp/{{ cs_dir }}.tar.gz"
+        mode: '0644'
+
+    - name: Extract code-server into /usr/local/share
+      unarchive:
+        src: "/tmp/{{ cs_dir }}.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+
+    - name: Symlink /usr/lib/code-server → extracted folder
+      file:
+        src: "{{ install_dir }}/{{ cs_dir }}"
+        dest: "/usr/lib/code-server"
+        state: link
+        force: yes
+
+    - name: Symlink /usr/bin/code-server → executable
+      file:
+        src: "/usr/lib/code-server/bin/code-server"
+        dest: "/usr/bin/code-server"
+        state: link
+        force: yes
+
+    - name: Create /var/lib/code-server directory
+      file:
+        path: "/var/lib/code-server"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install code-server systemd unit
+      template:
+        src: "templates/code-server.service.j2"
+        dest: "/lib/systemd/system/code-server.service"
+        mode: '0644'
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Start and enable code-server service
+      systemd:
+        name: code-server
+        state: started
+        enabled: yes

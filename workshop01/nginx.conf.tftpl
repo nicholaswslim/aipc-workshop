@@ -1,0 +1,30 @@
+user nginx;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log  /var/log/nginx/error.log notice;
+events {
+    worker_connections 768;
+}
+http {
+  include       /etc/nginx/mime.types;
+  default_type  application/octet-stream;
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+    gzip on;
+    upstream apps {
+        least_conn;
+        # TODO
+        # the following list the container endpoints
+      # one server line for each endpoint
+      # eg server <docker_host_ip>:<internal_port>;
+      %{~ for name in bggapp_names ~}
+      server ${name}:${bggapp_port};
+      %{~ endfor ~}
+    }
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://apps;
+        }
+    }
+}

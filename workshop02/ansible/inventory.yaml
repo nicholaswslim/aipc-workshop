@@ -1,0 +1,11 @@
+all:
+  vars:
+    ansible_user: root
+    ansible_connection: ssh
+    ansible_python_interpreter: "/usr/bin/python3"
+    ansible_ssh_private_key_file: "/home/fred/.ssh/id_ed25519_fred"
+    code_server_password: "changeit"
+
+  hosts:
+    code-server-droplet:
+      ansible_host: "129.212.239.4"
