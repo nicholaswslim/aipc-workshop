@@ -1,0 +1,61 @@
+- name: Install and configure nginx for code-server
+  hosts: default
+  become: yes
+
+  tasks:
+    # 1) Install nginx
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    # 2) Copy code-server.conf to sites-available
+    - name: Deploy nginx vhost for code-server
+      ansible.builtin.template:
+        src: templates/code-server.conf.j2
+        dest: /etc/nginx/sites-available/code-server.conf
+        mode: "0644"
+
+    # (optional) Disable default site so only code-server answers on port 80
+    - name: Disable default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    # 3) Symlink sites-available → sites-enabled
+    - name: Enable code-server nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/code-server.conf
+        dest: /etc/nginx/sites-enabled/code-server.conf
+        state: link
+        force: yes
+
+    # Sanity check nginx config before restart
+    - name: Test nginx configuration
+      ansible.builtin.command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Show nginx -t output
+      ansible.builtin.debug:
+        var: nginx_test.stdout_lines
+
+    # 4) Restart nginx
+    - name: Restart and enable nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    # 5) Test code-server via nginx (basic check)
+    - name: Test code-server HTTP endpoint via nginx
+      ansible.builtin.uri:
+        url: "http://code-{{ ansible_host }}.nip.io"
+        return_content: no
+        status_code: 200
+      register: code_server_http
+
+    - name: Show test result
+      ansible.builtin.debug:
+        var: code_server_http.status
